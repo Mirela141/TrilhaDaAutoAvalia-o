@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trilha da Autoavaliação - O Jogo da Vida Escolar</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti for Celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Nunito', 'sans-serif'],
+                        display: ['Fredoka', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            da: '#10B981',   // Verde (DA)
+                            dpa: '#3B82F6',  // Azul (DPA)
+                            dap: '#F59E0B',  // Amarelo/Laranja (DAP)
+                            dns: '#EF4444',  // Vermelho (DNS)
+                            purple: '#8B5CF6',
+                            yellow: '#FBBF24'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 50%, #e0e7ff 100%);
+            min-height: 100vh;
+        }
+        .font-display {
+            font-family: 'Fredoka', sans-serif;
+        }
+        
+        /* Board tile custom styles */
+        .tile-card {
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .tile-card:hover {
+            transform: translateY(-4px) scale(1.02);
+        }
+
+        /* Dice animation */
+        @keyframes roll {
+            0% { transform: rotate(0deg) scale(0.8); }
+            50% { transform: rotate(180deg) scale(1.2); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+        .rolling {
+            animation: roll 0.5s ease-in-out infinite;
+        }
+
+        /* Pawn pulse effect */
+        .pawn-glow {
+            box-shadow: 0 0 15px rgba(234, 179, 8, 0.8);
+            animation: pulse-glow 1.5s infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(234, 179, 8, 0.8); }
+            50% { transform: scale(1.1); box-shadow: 0 0 25px rgba(234, 179, 8, 1); }
+        }
+    </style>
+</head>
+<body class="text-slate-800 flex flex-col min-h-screen">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-white/90 backdrop-blur-md border-b border-sky-100 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-tr from-indigo-600 to-purple-500 rounded-2xl flex items-center justify-center text-white text-xl shadow-md font-display font-bold">
+                    🎓
+                </div>
+                <div>
+                    <h1 class="font-display font-bold text-xl text-slate-800 leading-tight">Jornada da Autoavaliação</h1>
+                    <p class="text-xs text-slate-500 font-semibold">O Jogo da Vida Escolar & Aprendizagem</p>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="flex items-center gap-4 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold">
+                <!-- Timer Display -->
+                <div class="flex items-center gap-2 text-indigo-700 font-mono" title="Tempo Decorrido">
+                    <i class="fa-regular fa-clock text-lg"></i>
+                    <span id="timer-display">00:00</span>
+                </div>
+                <div class="h-4 w-[1px] bg-slate-300"></div>
+                <div class="flex items-center gap-2 text-emerald-600" title="Respostas Corretas">
+                    <i class="fa-solid fa-circle-check text-lg"></i>
+                    <span id="correct-count">0</span>
+                </div>
+                <div class="h-4 w-[1px] bg-slate-300"></div>
+                <div class="flex items-center gap-2 text-rose-500" title="Erros Cometidos">
+                    <i class="fa-solid fa-circle-xmark text-lg"></i>
+                    <span id="error-count">0</span>
+                </div>
+            </div>
+
+            <!-- Quick Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button onclick="openRankingModal()" class="bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-2 rounded-xl border border-amber-200 text-xs font-bold transition flex items-center gap-2">
+                    <i class="fa-solid fa-trophy"></i> Ranking
+                </button>
+                <button onclick="openLegendModal()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-2 rounded-xl border border-indigo-200 text-xs font-bold transition flex items-center gap-2">
+                    <i class="fa-solid fa-book-open"></i> Guia (DA, DPA...)
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <!-- Left Side Control Panel -->
+        <aside class="lg:col-span-1 space-y-4 flex flex-col">
+            <!-- Player Status Card -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 text-center relative overflow-hidden">
+                <div class="absolute -top-12 -right-12 w-28 h-28 bg-indigo-50 rounded-full pointer-events-none"></div>
+                
+                <div class="relative z-10">
+                    <div id="player-avatar" class="w-16 h-16 mx-auto bg-gradient-to-tr from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-3xl shadow-md mb-2 border-4 border-white">
+                        🧑‍🎓
+                    </div>
+                    <h2 id="player-name" class="font-display font-bold text-lg text-slate-800">Estudante Consciente</h2>
+                    <p class="text-xs text-indigo-600 font-semibold bg-indigo-50 inline-block px-2 py-0.5 rounded-full mt-1">
+                        Casa Atual: <span id="current-tile-num">0</span> / <span id="total-tiles-num">12</span>
+                    </p>
+
+                    <div class="mt-4 pt-3 border-t border-slate-100">
+                        <p class="text-xs text-slate-500 mb-1">Progresso da Jornada</p>
+                        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                            <div id="progress-bar" class="bg-gradient-to-r from-indigo-500 to-purple-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dice Roll Box -->
+            <div class="bg-gradient-to-br from-indigo-600 to-purple-700 p-5 rounded-2xl shadow-md text-white text-center flex-1 flex flex-col justify-between">
+                <div>
+                    <h3 class="font-display font-bold text-lg mb-1">Sua Vez de Jogar!</h3>
+                    <p class="text-xs text-indigo-100">Role o dado para avançar na sua vida escolar e encarar novos desafios.</p>
+                </div>
+
+                <!-- Animated Dice Visual -->
+                <div class="my-6">
+                    <div id="dice" class="w-20 h-20 bg-white rounded-2xl mx-auto shadow-lg flex items-center justify-center text-slate-800 text-4xl font-display font-bold border-4 border-indigo-200 transition">
+                        🎲
+                    </div>
+                </div>
+
+                <button id="roll-btn" onclick="rollDice()" class="w-full bg-amber-400 hover:bg-amber-300 text-slate-900 font-display font-bold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-dice text-xl"></i> ROLAR O DADO
+                </button>
+            </div>
+        </aside>
+
+        <!-- Right Side: Game Board Path -->
+        <section class="lg:col-span-3 bg-white/70 backdrop-blur-sm p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-display font-bold text-xl text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-map-location-dot text-indigo-600"></i>
+                    Caminho do Aprendizado
+                </h3>
+                <span class="text-xs font-semibold text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">
+                    Siga até a Graduação Final 🏆
+                </span>
+            </div>
+
+            <!-- Interactive Board Grid -->
+            <div id="board-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 flex-1 min-h-[420px] content-start">
+                <!-- Tiles generated dynamically via JS -->
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL 1: Question Modal (Jogo 1 - Níveis & Jogo 2 - Pode/Não Pode) -->
+    <div id="question-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-xl w-full p-6 md:p-8 transform transition-all relative overflow-hidden border border-slate-100">
+            <!-- Modal Header Badge -->
+            <div class="flex justify-between items-center mb-4">
+                <span id="modal-type-badge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700">
+                    Desafio
+                </span>
+                <span class="text-xs font-semibold text-slate-400" id="modal-tile-number">Casa #</span>
+            </div>
+
+            <!-- Question Content -->
+            <h3 id="modal-title" class="font-display font-bold text-xl text-slate-800 mb-3">
+                Título do Desafio
+            </h3>
+            
+            <div id="modal-scenario-box" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6 text-slate-700 text-sm leading-relaxed">
+                Situação...
+            </div>
+
+            <!-- Answer Options Container -->
+            <div id="modal-options-container" class="space-y-3 mb-6">
+                <!-- Options injected by JS -->
+            </div>
+
+            <!-- Feedback Area (Hidden initially) -->
+            <div id="modal-feedback" class="hidden p-4 rounded-2xl mb-6 text-sm">
+                <!-- Feedback JS -->
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="flex justify-end gap-3">
+                <button id="modal-submit-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-display font-bold py-3 px-6 rounded-xl transition shadow-md">
+                    Confirmar Resposta
+                </button>
+                <button id="modal-next-btn" onclick="closeQuestionModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-display font-bold py-3 px-6 rounded-xl transition shadow-md hidden">
+                    Continuar a Jornada <i class="fa-solid fa-arrow-right ml-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Legend / Reference Guide Modal -->
+    <div id="legend-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 md:p-8 border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                <h3 class="font-display font-bold text-xl text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-graduation-cap text-indigo-600"></i> Guia Oficial dos Níveis de Desempenho
+                </h3>
+                <button onclick="closeLegendModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <p class="text-sm text-slate-600 mb-4">
+                Na autoavaliação, você reflete sobre como aprendeu cada conteúdo. Conheça o significado de cada nível:
+            </p>
+
+            <div class="space-y-3">
+                <!-- DA -->
+                <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                    <div class="flex items-center gap-2 font-display font-bold text-emerald-800 text-lg">
+                        <span class="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-sm">DA</span>
+                        Desempenho Autônomo
+                    </div>
+                    <p class="text-xs text-emerald-900 mt-2 leading-relaxed">
+                        Consegue realizar as atividades da disciplina **sozinho(a)**, compreende bem o conteúdo e muitas vezes consegue até **ajudar os colegas** a entenderem.
+                    </p>
+                </div>
+
+                <!-- DPA -->
+                <div class="p-4 rounded-2xl bg-blue-50 border border-blue-200">
+                    <div class="flex items-center gap-2 font-display font-bold text-blue-800 text-lg">
+                        <span class="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center text-sm">DPA</span>
+                        Desempenho Parcialmente Autônomo
+                    </div>
+                    <p class="text-xs text-blue-900 mt-2 leading-relaxed">
+                        Consegue fazer as atividades na maior parte do tempo com autonomia, mas **em alguns momentos precisa tirar dúvidas** com o professor ou pedir orientação em conteúdos novos.
+                    </p>
+                </div>
+
+                <!-- DAP -->
+                <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200">
+                    <div class="flex items-center gap-2 font-display font-bold text-amber-800 text-lg">
+                        <span class="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center text-sm">DAP</span>
+                        Desempenho Apoiado
+                    </div>
+                    <p class="text-xs text-amber-900 mt-2 leading-relaxed">
+                        Consegue realizar os exercícios **somente quando o professor ou um colega explica cada etapa** passo a passo do processo.
+                    </p>
+                </div>
+
+                <!-- DNS -->
+                <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200">
+                    <div class="flex items-center gap-2 font-display font-bold text-rose-800 text-lg">
+                        <span class="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center text-sm">DNS</span>
+                        Não Satisfatório
+                    </div>
+                    <p class="text-xs text-rose-900 mt-2 leading-relaxed">
+                        Mesmo tentando e pedindo ajuda, **ainda encontra grande dificuldade** para compreender a habilidade e finalizar as tarefas. Precisa de novo apoio pedagógico.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t flex justify-end">
+                <button onclick="closeLegendModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-display font-bold py-2.5 px-5 rounded-xl text-sm">
+                    Entendi! Voltar ao Jogo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: Victory & Certificate Modal -->
+    <div id="victory-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 text-center border-4 border-amber-300 relative overflow-hidden">
+            <div class="text-6xl mb-3">🎓🎉</div>
+            <h2 class="font-display font-bold text-3xl text-slate-800 mb-1">Parabéns, <span id="victory-player-name">Estudante</span>!</h2>
+            <p class="text-slate-600 text-sm mb-6">Você concluiu a Trilha da Autoavaliação com sucesso!</p>
+
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-left space-y-2 text-sm">
+                <div class="flex justify-between items-center border-b border-amber-200 pb-2">
+                    <span class="text-slate-600">Tempo de Jogo:</span>
+                    <span class="font-bold text-slate-800 text-base" id="final-time">00:00</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-amber-200 pb-2">
+                    <span class="text-slate-600">Estrelas Conquistadas:</span>
+                    <span class="font-bold text-amber-600 text-base" id="final-stars">0 ⭐</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-amber-200 pb-2">
+                    <span class="text-slate-600">Consciência Escolar:</span>
+                    <span class="font-bold text-indigo-600 text-base" id="final-score">0 pts</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-600">Diagnóstico da Autoavaliação:</span>
+                    <span class="font-bold text-emerald-600 text-base" id="final-level">Mestre Honesto</span>
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-500 mb-6 italic">
+                "A autoavaliação sincera é o primeiro passo para o verdadeiro aprendizado!"
+            </p>
+
+            <div class="space-y-3">
+                <button onclick="openRankingModal()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-display font-bold py-3 px-6 rounded-xl transition shadow-lg text-lg flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-trophy"></i> Ver Placar dos Participantes
+                </button>
+                <button onclick="nextPlayerGame()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-display font-bold py-3 px-6 rounded-xl transition shadow-lg text-lg flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-user-plus"></i> Próximo Jogador
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: Player Name Entry Modal -->
+    <div id="name-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 md:p-8 border border-slate-100 text-center">
+            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 font-display">
+                🎓
+            </div>
+            <h2 class="font-display font-bold text-2xl text-slate-800 mb-2">Bem-vindo à Trilha!</h2>
+            <p class="text-slate-600 text-sm mb-6">Digite seu nome para iniciar a sua jornada de autoavaliação e entrar no ranking da turma:</p>
+
+            <form onsubmit="handleStartGame(event)" class="space-y-4">
+                <input id="player-name-input" type="text" placeholder="Seu Nome ou Apelido" required maxlength="25" class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-center font-bold text-slate-800 text-lg">
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-display font-bold py-3 px-6 rounded-xl transition shadow-lg text-lg">
+                    Iniciar Desafio <i class="fa-solid fa-play ml-2"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 5: Leaderboard / Ranking Modal -->
+    <div id="ranking-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 md:p-8 border border-slate-100 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                <h3 class="font-display font-bold text-xl text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-amber-500"></i> Ranking da Turma
+                </h3>
+                <button onclick="closeRankingModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-500 mb-4">Classificação por <strong>Menor Número de Erros</strong> e <strong>Menor Tempo de Conclusão</strong>:</p>
+
+            <div class="overflow-y-auto flex-1 rounded-2xl border border-slate-200">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600 font-display text-xs border-b border-slate-200">
+                            <th class="p-3 text-center">#</th>
+                            <th class="p-3">Participante</th>
+                            <th class="p-3 text-center">Erros</th>
+                            <th class="p-3 text-center">Acertos</th>
+                            <th class="p-3 text-center">Tempo</th>
+                            <th class="p-3 text-center">Pontos (Final)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ranking-table-body" class="divide-y divide-slate-100 font-semibold text-slate-700">
+                        <!-- Ranking list generated via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-6 pt-4 border-t flex justify-between items-center">
+                <button onclick="nextPlayerGame()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-display font-bold py-2.5 px-5 rounded-xl text-sm">
+                    <i class="fa-solid fa-user-plus mr-1"></i> Jogar com Novo Aluno
+                </button>
+                <button onclick="closeRankingModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-display font-bold py-2.5 px-5 rounded-xl text-sm">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME DATA STRUCTURES --- //
+
+        // Questions for Jogo 1 (Níveis: DA, DPA, DAP, DNS)
+        const nivelQuestions = [
+            {
+                type: 'NIVEL',
+                badge: 'Jogo 1 • Qual o Nível?',
+                title: 'Desafio do Nível: Caso da Maria',
+                scenario: 'Maria consegue realizar todas as atividades da disciplina sozinha. Quando termina, ainda ajuda seus colegas a entenderem o conteúdo.',
+                options: [
+                    { id: 'DA', text: 'DA - Desempenho Autônomo' },
+                    { id: 'DPA', text: 'DPA - Desempenho Parcialmente Autônomo' },
+                    { id: 'DAP', text: 'DAP - Desempenho Apoiado' },
+                    { id: 'DNS', text: 'DNS - Não Satisfatório' }
+                ],
+                correct: 'DA',
+                justification: 'Ela desenvolve e compreende a habilidade sem auxílio do professor ou dos colegas, demonstrando desempenho autônomo.'
+            },
+            {
+                type: 'NIVEL',
+                badge: 'Jogo 1 • Qual o Nível?',
+                title: 'Desafio do Nível: Caso do Lucas',
+                scenario: 'Lucas consegue fazer as atividades, mas em alguns momentos precisa pedir ajuda ao professor para tirar dúvidas antes de continuar.',
+                options: [
+                    { id: 'DA', text: 'DA - Desempenho Autônomo' },
+                    { id: 'DPA', text: 'DPA - Desempenho Parcialmente Autônomo' },
+                    { id: 'DAP', text: 'DAP - Desempenho Apoiado' },
+                    { id: 'DNS', text: 'DNS - Não Satisfatório' }
+                ],
+                correct: 'DPA',
+                justification: 'Ele consegue desenvolver a habilidade, porém com auxílio em alguns momentos, demonstrando desempenho parcialmente autônomo.'
+            },
+            {
+                type: 'NIVEL',
+                badge: 'Jogo 1 • Qual o Nível?',
+                title: 'Desafio do Nível: Caso da Ana',
+                scenario: 'Ana só consegue realizar as atividades quando um colega ou o professor explica cada etapa do exercício passo a passo.',
+                options: [
+                    { id: 'DA', text: 'DA - Desempenho Autônomo' },
+                    { id: 'DPA', text: 'DPA - Desempenho Parcialmente Autônomo' },
+                    { id: 'DAP', text: 'DAP - Desempenho Apoiado' },
+                    { id: 'DNS', text: 'DNS - Não Satisfatório' }
+                ],
+                correct: 'DAP',
+                justification: 'Ela consegue desenvolver a habilidade somente com auxílio constante, configurando desempenho apoiado.'
+            },
+            {
+                type: 'NIVEL',
+                badge: 'Jogo 1 • Qual o Nível?',
+                title: 'Desafio do Nível: Caso do Pedro',
+                scenario: 'Pedro tentou realizar a atividade, pediu ajuda ao professor, mas ainda assim não conseguiu compreender o conteúdo nem finalizar a tarefa.',
+                options: [
+                    { id: 'DA', text: 'DA - Desempenho Autônomo' },
+                    { id: 'DPA', text: 'DPA - Desempenho Parcialmente Autônomo' },
+                    { id: 'DAP', text: 'DAP - Desempenho Apoiado' },
+                    { id: 'DNS', text: 'DNS - Não Satisfatório' }
+                ],
+                correct: 'DNS',
+                justification: 'Ainda não demonstra capacidade de desenvolver ou compreender a habilidade no momento, resultando em nível Não Satisfatório.'
+            },
+            {
+                type: 'NIVEL',
+                badge: 'Jogo 1 • Qual o Nível?',
+                title: 'Desafio do Nível: Caso da Beatriz',
+                scenario: 'Beatriz faz quase todas as atividades sozinha, mas quando encontra um conteúdo novo costuma pedir orientação ao professor antes de continuar.',
+                options: [
+                    { id: 'DA', text: 'DA - Desempenho Autônomo' },
+                    { id: 'DPA', text: 'DPA - Desempenho Parcialmente Autônomo' },
+                    { id: 'DAP', text: 'DAP - Desempenho Apoiado' },
+                    { id: 'DNS', text: 'DNS - Não Satisfatório' }
+                ],
+                correct: 'DPA',
+                justification: 'Ela demonstra autonomia na maior parte do tempo, mas ainda necessita de auxílio em algumas situações (Desempenho Parcialmente Autônomo).'
+            },
+            {
+                type: 'NIVEL',
+                badge: '🔥 Nível Avançado (Casa 15+)',
+                title: 'Desafio Avançado: Caso do Gabriel',
+                scenario: 'Gabriel domina a teoria de História sozinho (DA), mas em análises críticas complexas de documentos históricos, precisa da mediação do professor para encadear os argumentos.',
+                options: [
+                    { id: 'DA', text: 'DA - Desempenho Autônomo' },
+                    { id: 'DPA', text: 'DPA - Desempenho Parcialmente Autônomo' },
+                    { id: 'DAP', text: 'DAP - Desempenho Apoiado' },
+                    { id: 'DNS', text: 'DNS - Não Satisfatório' }
+                ],
+                correct: 'DPA',
+                justification: 'Gabriel possui autonomia na leitura inicial, porém necessita de mediação pontual nas análises críticas complexas (Desempenho Parcialmente Autônomo).'
+            },
+            {
+                type: 'NIVEL',
+                badge: '🔥 Nível Avançado (Casa 15+)',
+                title: 'Desafio Avançado: Caso da Sofia',
+                scenario: 'Sofia resolve equações simples com facilidade, mas ao encarar sistemas de equações aplicados a problemas reais, só avança quando o professor resolve um exemplo idêntico junto com ela passo a passo.',
+                options: [
+                    { id: 'DA', text: 'DA - Desempenho Autônomo' },
+                    { id: 'DPA', text: 'DPA - Desempenho Parcialmente Autônomo' },
+                    { id: 'DAP', text: 'DAP - Desempenho Apoiado' },
+                    { id: 'DNS', text: 'DNS - Não Satisfatório' }
+                ],
+                correct: 'DAP',
+                justification: 'Para a habilidade de sistemas complexos, Sofia necessita de suporte e acompanhamento contínuo passo a passo (Desempenho Apoiado).'
+            },
+            {
+                type: 'NIVEL',
+                badge: '🔥 Nível Avançado (Casa 15+)',
+                title: 'Desafio Avançado: Caso do Rodrigo',
+                scenario: 'Rodrigo é muito ágil nas práticas de laboratório, mas na hora de sintetizar relatórios científicos individuais, ele deixa em branco e não consegue concluir mesmo após explicações individuais repetidas.',
+                options: [
+                    { id: 'DA', text: 'DA - Desempenho Autônomo' },
+                    { id: 'DPA', text: 'DPA - Desempenho Parcialmente Autônomo' },
+                    { id: 'DAP', text: 'DAP - Desempenho Apoiado' },
+                    { id: 'DNS', text: 'DNS - Não Satisfatório' }
+                ],
+                correct: 'DNS',
+                justification: 'Na habilidade específica de síntese e escrita de relatórios, Rodrigo ainda não atingiu a compreensão mínima requerida (Não Satisfatório).'
+            },
+            {
+                type: 'NIVEL',
+                badge: '🔥 Nível Avançado (Casa 15+)',
+                title: 'Desafio Avançado: Caso da Larissa',
+                scenario: 'Larissa pesquisa fontes adicionais por conta própria, propõe soluções inovadoras nos projetos de tecnologia e frequentemente orienta colegas com dúvidas.',
+                options: [
+                    { id: 'DA', text: 'DA - Desempenho Autônomo' },
+                    { id: 'DPA', text: 'DPA - Desempenho Parcialmente Autônomo' },
+                    { id: 'DAP', text: 'DAP - Desempenho Apoiado' },
+                    { id: 'DNS', text: 'DNS - Não Satisfatório' }
+                ],
+                correct: 'DA',
+                justification: 'Larissa vai além da realização individual, demonstrando pleno domínio, protagonismo e auxílio aos pares (Desempenho Autônomo).'
+            },
+            {
+                type: 'NIVEL',
+                badge: '🔥 Nível Avançado (Casa 15+)',
+                title: 'Desafio Avançado: Caso do Thiago',
+                scenario: 'Thiago realiza os exercícios do grupo em silêncio, mas quando convidado a explicar verbalmente o raciocínio sem ler o papel do colega, não consegue formular e pede ao grupo para fazer por ele.',
+                options: [
+                    { id: 'DA', text: 'DA - Desempenho Autônomo' },
+                    { id: 'DPA', text: 'DPA - Desempenho Parcialmente Autônomo' },
+                    { id: 'DAP', text: 'DAP - Desempenho Apoiado' },
+                    { id: 'DNS', text: 'DNS - Não Satisfatório' }
+                ],
+                correct: 'DAP',
+                justification: 'Na expressão verbal da aprendizagem, Thiago depende do suporte direto e condução dos colegas (Desempenho Apoiado).'
+            }
+        ];
+
+        // Questions for Jogo 2 (Pode ou Não Pode? - Verdadeiro/Falso)
+        const podeQuestions = [
+            {
+                type: 'PODE',
+                badge: 'Jogo 2 • Pode ou Não Pode?',
+                title: 'Atitude na Autoavaliação',
+                scenario: 'Na autoavaliação devo escolher o nível que melhor representa meu desempenho real, mesmo que não seja o mais alto da escala.',
+                options: [
+                    { id: 'PODE', text: '✅ Pode (Verdadeiro)' },
+                    { id: 'NAO_PODE', text: '❌ Não Pode (Falso)' }
+                ],
+                correct: 'PODE',
+                justification: 'Correto! A autoavaliação exige honestidade para que o professor possa te ajudar a evoluir exatamente onde você precisa.'
+            },
+            {
+                type: 'PODE',
+                badge: 'Jogo 2 • Pode ou Não Pode?',
+                title: 'Escolha de Nota x Honestidade',
+                scenario: 'Se quero uma nota melhor, posso escolher DA mesmo sabendo que ainda preciso de muita ajuda para fazer os exercícios.',
+                options: [
+                    { id: 'PODE', text: '✅ Pode (Verdadeiro)' },
+                    { id: 'NAO_PODE', text: '❌ Não Pode (Falso)' }
+                ],
+                correct: 'NAO_PODE',
+                justification: 'Não pode! Marcar um nível mais alto sem ter autonomia engana a si mesmo e impede que você receba o auxílio necessário.'
+            },
+            {
+                type: 'PODE',
+                badge: 'Jogo 2 • Pode ou Não Pode?',
+                title: 'Níveis Diferentes em Disciplinas',
+                scenario: 'É normal estar em níveis diferentes em disciplinas diferentes (ex: DA em História e DAP em Matemática), pois cada uma avalia habilidades específicas.',
+                options: [
+                    { id: 'PODE', text: '✅ Pode (Verdadeiro)' },
+                    { id: 'NAO_PODE', text: '❌ Não Pode (Falso)' }
+                ],
+                correct: 'PODE',
+                justification: 'Com certeza! Cada pessoa possui ritmos e facilidades diferentes para cada matéria.'
+            },
+            {
+                type: 'PODE',
+                badge: 'Jogo 2 • Pode ou Não Pode?',
+                title: 'Tirar Dúvidas com o Professor',
+                scenario: 'Se eu tiver dúvidas sobre um critério da autoavaliação, devo conversar com o professor antes de responder.',
+                options: [
+                    { id: 'PODE', text: '✅ Pode (Verdadeiro)' },
+                    { id: 'NAO_PODE', text: '❌ Não Pode (Falso)' }
+                ],
+                correct: 'PODE',
+                justification: 'Excelente! Esclarecer o significado de cada critério garante uma autoavaliação muito mais justa e reflexiva.'
+            },
+            {
+                type: 'PODE',
+                badge: 'Jogo 2 • Pode ou Não Pode?',
+                title: 'Apenas uma "Nota"?',
+                scenario: 'A autoavaliação serve apenas para dar uma nota a si mesmo no final do bimestre, sem precisar refletir sobre a própria aprendizagem.',
+                options: [
+                    { id: 'PODE', text: '✅ Pode (Verdadeiro)' },
+                    { id: 'NAO_PODE', text: '❌ Não Pode (Falso)' }
+                ],
+                correct: 'NAO_PODE',
+                justification: 'Não pode! O principal objetivo da autoavaliação é a reflexão sobre o seu próprio processo de aprendizagem e pontos a melhorar.'
+            },
+            {
+                type: 'PODE',
+                badge: '🔥 Pode ou Não Pode? (Casa 15+)',
+                title: 'Ocultar Dificuldades',
+                scenario: 'Se em uma autoavaliação eu perceber que fiquei em DAP numa habilidade importante, devo marcar DA para o professor não pensar que estou fraco.',
+                options: [
+                    { id: 'PODE', text: '✅ Pode (Verdadeiro)' },
+                    { id: 'NAO_PODE', text: '❌ Não Pode (Falso)' }
+                ],
+                correct: 'NAO_PODE',
+                justification: 'Não pode! Omitir dificuldades impede o professor de elaborar um plano de apoio pedagógico para você evoluir.'
+            },
+            {
+                type: 'PODE',
+                badge: '🔥 Pode ou Não Pode? (Casa 15+)',
+                title: 'Evolução Contínua',
+                scenario: 'Posso atualizar e reavaliar meu nível de DPA para DA ao longo do bimestre caso eu passe a realizar as tarefas com total autonomia.',
+                options: [
+                    { id: 'PODE', text: '✅ Pode (Verdadeiro)' },
+                    { id: 'NAO_PODE', text: '❌ Não Pode (Falso)' }
+                ],
+                correct: 'PODE',
+                justification: 'Com certeza! A autoavaliação é um processo vivo e dinâmico que acompanha o seu crescimento acadêmico.'
+            },
+            {
+                type: 'PODE',
+                badge: '🔥 Pode ou Não Pode? (Casa 15+)',
+                title: 'Copiar vs Aprender',
+                scenario: 'Se eu apenas copiei todas as respostas do quadro de forma impecável sem entender a matéria, posso considerar meu desempenho como DA.',
+                options: [
+                    { id: 'PODE', text: '✅ Pode (Verdadeiro)' },
+                    { id: 'NAO_PODE', text: '❌ Não Pode (Falso)' }
+                ],
+                correct: 'NAO_PODE',
+                justification: 'Não pode! Copiar sem compreender não gera autonomia cognitiva nem aprendizado real.'
+            },
+            {
+                type: 'PODE',
+                badge: '🔥 Pode ou Não Pode? (Casa 15+)',
+                title: 'Plano de Ação Pessoal',
+                scenario: 'Ao identificar que estou em DAP em um conteúdo, posso propor ao professor uma estratégia ou estudo dirigido pessoal para melhorar.',
+                options: [
+                    { id: 'PODE', text: '✅ Pode (Verdadeiro)' },
+                    { id: 'NAO_PODE', text: '❌ Não Pode (Falso)' }
+                ],
+                correct: 'PODE',
+                justification: 'Excelente! Isso demonstra protagonismo e maturidade no seu próprio processo de aprendizagem!'
+            }
+        ];
+
+        // Special Events
+        const eventTiles = [
+            {
+                type: 'EVENTO',
+                badge: 'Evento da Vida Escolar',
+                title: 'Grupo de Estudos com Colegas',
+                scenario: 'Você se reuniu no final de semana para revisar os conteúdos com seus amigos e tirou dúvidas com quem entendia mais.',
+                options: [
+                    { id: 'OK', text: '🌟 Ganhar +15 Pts de Consciência e +1 Estrela!' }
+                ],
+                correct: 'OK',
+                justification: 'Aprender em grupo desenvolve a cooperação e reforça sua autonomia no aprendizado!'
+            },
+            {
+                type: 'EVENTO',
+                badge: 'Momento de Reflexão',
+                title: 'Conversa de Feedback com o Professor',
+                scenario: 'O professor te mostrou onde você errou no trabalho e você usou a dica para refazer o exercício.',
+                options: [
+                    { id: 'OK', text: '💡 Ganhar +20 Pts de Consciência!' }
+                ],
+                correct: 'OK',
+                justification: 'Saber ouvir feedbacks transforma seus erros em degraus de aprendizado!'
+            }
+        ];
+
+        // Board Tiles Setup (25 Tiles total)
+        const boardTiles = [
+            { id: 0, title: 'Início', icon: '🚀', type: 'START' },
+            { id: 1, title: 'Caso Maria', icon: '👩‍🎓', type: 'NIVEL', qIndex: 0 },
+            { id: 2, title: 'Pode ou Não?', icon: '⚖️', type: 'PODE', qIndex: 0 },
+            { id: 3, title: 'Caso Lucas', icon: '👨‍🎓', type: 'NIVEL', qIndex: 1 },
+            { id: 4, title: 'Grupo Estudo', icon: '👥', type: 'EVENTO', eIndex: 0 },
+            { id: 5, title: 'Pode ou Não?', icon: '❓', type: 'PODE', qIndex: 1 },
+            { id: 6, title: 'Caso Ana', icon: '📝', type: 'NIVEL', qIndex: 2 },
+            { id: 7, title: 'Diferenças', icon: '📚', type: 'PODE', qIndex: 2 },
+            { id: 8, title: 'Caso Pedro', icon: '💡', type: 'NIVEL', qIndex: 3 },
+            { id: 9, title: 'Dúvidas?', icon: '🗣️', type: 'PODE', qIndex: 3 },
+            { id: 10, title: 'Caso Beatriz', icon: '⭐', type: 'NIVEL', qIndex: 4 },
+            { id: 11, title: 'Apenas Nota?', icon: '🎯', type: 'PODE', qIndex: 4 },
+            { id: 12, title: 'Feedback Prof', icon: '💬', type: 'EVENTO', eIndex: 1 },
+            { id: 13, title: 'Grupo Revisão', icon: '📖', type: 'EVENTO', eIndex: 0 },
+            { id: 14, title: 'Meio do Caminho', icon: '🚩', type: 'PODE', qIndex: 0 },
+            // --- DESAFIOS AVANÇADOS (CASA 15+) ---
+            { id: 15, title: 'Caso Gabriel', icon: '🔥', type: 'NIVEL', qIndex: 5, isHard: true },
+            { id: 16, title: 'Ocultar Dificuldades?', icon: '🛡️', type: 'PODE', qIndex: 5, isHard: true },
+            { id: 17, title: 'Caso Sofia', icon: '🧩', type: 'NIVEL', qIndex: 6, isHard: true },
+            { id: 18, title: 'Evolução no Ciclo', icon: '📈', type: 'PODE', qIndex: 6, isHard: true },
+            { id: 19, title: 'Caso Rodrigo', icon: '🔬', type: 'NIVEL', qIndex: 7, isHard: true },
+            { id: 20, title: 'Copiar da Lousa?', icon: '✏️', type: 'PODE', qIndex: 7, isHard: true },
+            { id: 21, title: 'Caso Larissa', icon: '🌟', type: 'NIVEL', qIndex: 8, isHard: true },
+            { id: 22, title: 'Plano de Ação', icon: '📋', type: 'PODE', qIndex: 8, isHard: true },
+            { id: 23, title: 'Caso Thiago', icon: '🎤', type: 'NIVEL', qIndex: 9, isHard: true },
+            { id: 24, title: 'Diferença de Matérias', icon: '📊', type: 'PODE', qIndex: 2, isHard: true },
+            { id: 25, title: 'Graduação Final', icon: '🏆', type: 'FINISH' }
+        ];
+
+        // --- GAME STATE --- //
+        let playerState = {
+            name: 'Estudante',
+            position: 0,
+            stars: 0,
+            score: 0,
+            correctCount: 0,
+            errorCount: 0,
+            lastRoll: 0,
+            isRolling: false,
+            selectedOption: null,
+            currentQuestion: null,
+            elapsedSeconds: 0,
+            timerInterval: null
+        };
+
+        let rankings = [];
+
+        window.onload = function() {
+            renderBoard();
+            updateUI();
+        };
+
+        function handleStartGame(e) {
+            e.preventDefault();
+            const inputName = document.getElementById('player-name-input').value.trim();
+            if (inputName) {
+                playerState.name = inputName;
+                document.getElementById('player-name').textContent = inputName;
+            }
+            document.getElementById('name-modal').classList.add('hidden');
+            startTimer();
+        }
+
+        function startTimer() {
+            clearInterval(playerState.timerInterval);
+            playerState.elapsedSeconds = 0;
+            updateTimerDisplay();
+            playerState.timerInterval = setInterval(() => {
+                playerState.elapsedSeconds++;
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(playerState.timerInterval);
+        }
+
+        function updateTimerDisplay() {
+            document.getElementById('timer-display').textContent = formatTime(playerState.elapsedSeconds);
+        }
+
+        function formatTime(totalSecs) {
+            const mins = Math.floor(totalSecs / 60).toString().padStart(2, '0');
+            const secs = (totalSecs % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        function renderBoard() {
+            const grid = document.getElementById('board-grid');
+            grid.innerHTML = '';
+
+            boardTiles.forEach((tile) => {
+                const isCurrent = playerState.position === tile.id;
+                
+                let tileBg = 'bg-white border-slate-200';
+
+                if (tile.type === 'START') tileBg = 'bg-emerald-50 border-emerald-300';
+                else if (tile.type === 'FINISH') tileBg = 'bg-amber-50 border-amber-300';
+                else if (tile.isHard) tileBg = 'bg-gradient-to-br from-amber-50 via-rose-50 to-orange-50 border-amber-300';
+                else if (tile.type === 'NIVEL') tileBg = 'bg-indigo-50/60 border-indigo-200';
+                else if (tile.type === 'PODE') tileBg = 'bg-sky-50/60 border-sky-200';
+                else if (tile.type === 'EVENTO') tileBg = 'bg-purple-50/60 border-purple-200';
+
+                const card = document.createElement('div');
+                card.id = `tile-${tile.id}`;
+                card.className = `tile-card p-2.5 rounded-2xl border-2 flex flex-col justify-between relative shadow-sm min-h-[90px] ${tileBg} ${isCurrent ? 'ring-4 ring-amber-400 font-bold scale-105 z-10' : ''}`;
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                        <span>#${tile.id}</span>
+                        ${tile.isHard ? '<span class="bg-amber-200 text-amber-900 px-1 rounded text-[9px]">🔥 Avançado</span>' : ''}
+                    </div>
+
+                    <div class="my-1 flex items-center gap-1.5">
+                        <span class="text-xl">${tile.icon}</span>
+                        <span class="text-xs font-display font-bold text-slate-800 leading-tight">${tile.title}</span>
+                    </div>
+
+                    ${isCurrent ? `
+                        <div class="absolute -top-3 -right-2 bg-amber-400 text-slate-900 rounded-full w-7 h-7 flex items-center justify-center text-xs pawn-glow font-bold">
+                            🧑‍🎓
+                        </div>
+                    ` : ''}
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        function rollDice() {
+            if (playerState.isRolling) return;
+            if (playerState.position >= boardTiles.length - 1) {
+                showVictoryModal();
+                return;
+            }
+
+            playerState.isRolling = true;
+            const diceEl = document.getElementById('dice');
+            const rollBtn = document.getElementById('roll-btn');
+            
+            rollBtn.disabled = true;
+            rollBtn.classList.add('opacity-50');
+            diceEl.classList.add('rolling');
+
+            // Simulate dice spin delay
+            setTimeout(() => {
+                const diceValue = Math.floor(Math.random() * 3) + 1; // 1 to 3 steps
+                playerState.lastRoll = diceValue; // Save roll value for setback penalty if answer is wrong
+                diceEl.textContent = getDiceEmoji(diceValue);
+                diceEl.classList.remove('rolling');
+
+                movePlayer(diceValue);
+            }, 600);
+        }
+
+        function getDiceEmoji(val) {
+            const diceEmojis = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+            return diceEmojis[val - 1] || '🎲';
+        }
+
+        function movePlayer(steps) {
+            let targetPosition = playerState.position + steps;
+            if (targetPosition >= boardTiles.length - 1) {
+                targetPosition = boardTiles.length - 1;
+            }
+
+            playerState.position = targetPosition;
+            renderBoard();
+            updateUI();
+
+            setTimeout(() => {
+                playerState.isRolling = false;
+                const rollBtn = document.getElementById('roll-btn');
+                rollBtn.disabled = false;
+                rollBtn.classList.remove('opacity-50');
+
+                triggerTileAction(playerState.position);
+            }, 400);
+        }
+
+        function triggerTileAction(tileId) {
+            const tile = boardTiles[tileId];
+
+            if (tile.type === 'START') return;
+
+            if (tile.type === 'FINISH') {
+                showVictoryModal();
+                return;
+            }
+
+            let question = null;
+            if (tile.type === 'NIVEL') question = nivelQuestions[tile.qIndex];
+            if (tile.type === 'PODE') question = podeQuestions[tile.qIndex];
+            if (tile.type === 'EVENTO') question = eventTiles[tile.eIndex];
+
+            if (question) {
+                openQuestionModal(question, tileId);
+            }
+        }
+
+        function openQuestionModal(question, tileId) {
+            playerState.currentQuestion = question;
+            playerState.selectedOption = null;
+
+            document.getElementById('modal-type-badge').textContent = question.badge;
+            document.getElementById('modal-tile-number').textContent = `Casa #${tileId}`;
+            document.getElementById('modal-title').textContent = question.title;
+            document.getElementById('modal-scenario-box').textContent = question.scenario;
+
+            const optionsContainer = document.getElementById('modal-options-container');
+            optionsContainer.innerHTML = '';
+
+            question.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = `option-btn w-full text-left p-3.5 rounded-xl border-2 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50 transition font-medium text-sm text-slate-700 flex items-center justify-between`;
+                btn.onclick = () => selectOption(opt.id, btn);
+                btn.innerHTML = `
+                    <span>${opt.text}</span>
+                    <i class="fa-regular fa-circle text-slate-300 check-icon"></i>
+                `;
+                optionsContainer.appendChild(btn);
+            });
+
+            document.getElementById('modal-feedback').classList.add('hidden');
+            document.getElementById('modal-submit-btn').classList.remove('hidden');
+            document.getElementById('modal-next-btn').classList.add('hidden');
+
+            document.getElementById('question-modal').classList.remove('hidden');
+        }
+
+        function selectOption(optionId, btnElement) {
+            playerState.selectedOption = optionId;
+
+            document.querySelectorAll('.option-btn').forEach(b => {
+                b.classList.remove('border-indigo-600', 'bg-indigo-50', 'text-indigo-900');
+                b.classList.add('border-slate-200');
+                const icon = b.querySelector('.check-icon');
+                if (icon) {
+                    icon.className = 'fa-regular fa-circle text-slate-300 check-icon';
+                }
+            });
+
+            btnElement.classList.remove('border-slate-200');
+            btnElement.classList.add('border-indigo-600', 'bg-indigo-50', 'text-indigo-900');
+            const icon = btnElement.querySelector('.check-icon');
+            if (icon) {
+                icon.className = 'fa-solid fa-circle-check text-indigo-600 check-icon';
+            }
+        }
+
+        // Submit answer & show immediate pedagogical feedback with retreat penalty on error
+        document.getElementById('modal-submit-btn').addEventListener('click', () => {
+            const q = playerState.currentQuestion;
+            if (!playerState.selectedOption && q.type !== 'EVENTO') {
+                alert('Por favor, selecione uma opção antes de confirmar!');
+                return;
+            }
+
+            const isCorrect = (playerState.selectedOption === q.correct) || (q.type === 'EVENTO');
+            const feedbackBox = document.getElementById('modal-feedback');
+
+            if (isCorrect) {
+                playerState.correctCount += 1;
+                feedbackBox.className = 'p-4 rounded-2xl mb-6 text-sm bg-emerald-50 border border-emerald-200 text-emerald-900';
+                feedbackBox.innerHTML = `
+                    <div class="font-bold flex items-center gap-2 text-emerald-800 text-base mb-1">
+                        <i class="fa-solid fa-circle-check text-emerald-600"></i> Resposta Correta! (Acerto registrado)
+                    </div>
+                    <p class="mt-1">${q.justification}</p>
+                `;
+            } else {
+                playerState.errorCount += 1;
+                // Return player back by the amount rolled on dice
+                const stepsBack = playerState.lastRoll || 1;
+                const oldPos = playerState.position;
+                playerState.position = Math.max(0, playerState.position - stepsBack);
+
+                feedbackBox.className = 'p-4 rounded-2xl mb-6 text-sm bg-rose-50 border border-rose-200 text-rose-900';
+                feedbackBox.innerHTML = `
+                    <div class="font-bold flex items-center gap-2 text-rose-800 text-base mb-1">
+                        <i class="fa-solid fa-circle-xmark text-rose-600"></i> Quase lá! A resposta correta era: <strong>${q.correct}</strong>
+                    </div>
+                    <p class="mt-1"><strong>Justificativa:</strong> ${q.justification}</p>
+                    <div class="mt-3 pt-2 border-t border-rose-200 font-bold text-rose-700 flex items-center gap-2">
+                        <i class="fa-solid fa-backward text-base"></i> Penalidade de Erro: Você voltou ${stepsBack} casa(s) (foi da Casa #${oldPos} para a Casa #${playerState.position})!
+                    </div>
+                `;
+                
+                renderBoard(); // Update position on board immediately
+            }
+
+            feedbackBox.classList.remove('hidden');
+            document.getElementById('modal-submit-btn').classList.add('hidden');
+            document.getElementById('modal-next-btn').classList.remove('hidden');
+
+            updateUI();
+        });
+
+        function closeQuestionModal() {
+            document.getElementById('question-modal').classList.add('hidden');
+            if (playerState.position >= boardTiles.length - 1) {
+                showVictoryModal();
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('correct-count').textContent = playerState.correctCount;
+            document.getElementById('error-count').textContent = playerState.errorCount;
+            document.getElementById('current-tile-num').textContent = playerState.position;
+            document.getElementById('total-tiles-num').textContent = boardTiles.length - 1;
+
+            const progress = (playerState.position / (boardTiles.length - 1)) * 100;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+        }
+
+        function openLegendModal() {
+            document.getElementById('legend-modal').classList.remove('hidden');
+        }
+
+        function closeLegendModal() {
+            document.getElementById('legend-modal').classList.add('hidden');
+        }
+
+        function showVictoryModal() {
+            stopTimer();
+
+            // Compute final stars and score only at the end
+            playerState.stars = playerState.correctCount;
+            playerState.score = Math.max(0, (playerState.correctCount * 20) - (playerState.errorCount * 5));
+
+            document.getElementById('victory-player-name').textContent = playerState.name;
+            document.getElementById('final-time').textContent = formatTime(playerState.elapsedSeconds);
+            document.getElementById('final-stars').textContent = `${playerState.stars} ⭐ (${playerState.correctCount} acertos / ${playerState.errorCount} erros)`;
+            document.getElementById('final-score').textContent = `${playerState.score} pts`;
+
+            let evalText = "Aprendiz Reflexivo";
+            if (playerState.errorCount === 0) evalText = "Mestre da Precisão! (Zero Erros) 🏆";
+            else if (playerState.score >= 180) evalText = "Mestre da Autoavaliação! 🌟";
+            else if (playerState.score >= 120) evalText = "Estudante Consciente! 🎓";
+
+            document.getElementById('final-level').textContent = evalText;
+            
+            saveToRanking();
+
+            document.getElementById('victory-modal').classList.remove('hidden');
+
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        function saveToRanking() {
+            rankings.push({
+                name: playerState.name,
+                correctCount: playerState.correctCount,
+                errorCount: playerState.errorCount,
+                score: playerState.score,
+                stars: playerState.stars,
+                timeSecs: playerState.elapsedSeconds,
+                formattedTime: formatTime(playerState.elapsedSeconds)
+            });
+
+            // Ranking order: 1st by lowest errors, 2nd by highest correct, 3rd by fastest time
+            rankings.sort((a, b) => {
+                if (a.errorCount !== b.errorCount) return a.errorCount - b.errorCount;
+                if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
+                return a.timeSecs - b.timeSecs;
+            });
+        }
+
+        function openRankingModal() {
+            renderRanking();
+            document.getElementById('ranking-modal').classList.remove('hidden');
+        }
+
+        function closeRankingModal() {
+            document.getElementById('ranking-modal').classList.add('hidden');
+        }
+
+        function renderRanking() {
+            const tbody = document.getElementById('ranking-table-body');
+            tbody.innerHTML = '';
+
+            if (rankings.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="p-4 text-center text-slate-400 italic">Nenhum participante registrado ainda.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            rankings.forEach((item, idx) => {
+                let badgeClass = 'text-slate-500';
+                if (idx === 0) badgeClass = 'text-amber-500 font-bold text-base';
+                else if (idx === 1) badgeClass = 'text-slate-400 font-bold';
+                else if (idx === 2) badgeClass = 'text-amber-700 font-bold';
+
+                const tr = document.createElement('tr');
+                tr.className = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50';
+                tr.innerHTML = `
+                    <td class="p-3 text-center ${badgeClass}">
+                        ${idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
+                    </td>
+                    <td class="p-3 font-bold text-slate-800">${item.name}</td>
+                    <td class="p-3 text-center text-rose-600 font-bold">${item.errorCount}</td>
+                    <td class="p-3 text-center text-emerald-600 font-bold">${item.correctCount}</td>
+                    <td class="p-3 text-center font-mono text-slate-600">${item.formattedTime}</td>
+                    <td class="p-3 text-center text-indigo-600 font-bold">${item.score} pt (${item.stars}⭐)</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function nextPlayerGame() {
+            stopTimer();
+            playerState = {
+                name: 'Estudante',
+                position: 0,
+                stars: 0,
+                score: 0,
+                correctCount: 0,
+                errorCount: 0,
+                lastRoll: 0,
+                isRolling: false,
+                selectedOption: null,
+                currentQuestion: null,
+                elapsedSeconds: 0,
+                timerInterval: null
+            };
+
+            document.getElementById('victory-modal').classList.add('hidden');
+            document.getElementById('ranking-modal').classList.add('hidden');
+            document.getElementById('dice').textContent = '🎲';
+            document.getElementById('player-name-input').value = '';
+
+            renderBoard();
+            updateUI();
+
+            document.getElementById('name-modal').classList.remove('hidden');
+        }
+
+        function restartGame() {
+            nextPlayerGame();
+        }
+    </script>
+</body>
+</html>
